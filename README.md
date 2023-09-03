@@ -38,7 +38,7 @@ public class HelloController {
 ```
 So if the JWT doesn't list the `greeting.read` scope, the caller will receive a `403 - Forbidden` response.
 
-I like the approach of putting the authorization concern right by to the controller method being secured.
+I like the approach of putting the authorization concern right by the controller method being secured.
 If finer control is needed per endpoint, this approach is much nicer than the standard Spring boot approach of using 
 `HttpSecurity` in the `SecurityConfig` class (see that Okta blog post linked above).
 
