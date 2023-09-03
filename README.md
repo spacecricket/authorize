@@ -117,6 +117,7 @@ public class HelloController {
 # Callouts
 * This library needs to make outbound HTTP calls to the oauth provider to get updated public keys. There are concurrency concerns here.
 * Spring AOP is used to get these new annotations to work.
+* Probably the most important one - this is a hobby project!
 
 # Setup
 ... TODO
