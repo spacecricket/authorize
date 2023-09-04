@@ -1,7 +1,10 @@
 package space.crickets.authorize.aop;
 
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.JwtParser;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.security.SignatureException;
 import org.aspectj.lang.JoinPoint;
 import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
@@ -41,7 +44,14 @@ public class AuthorizeAnnotationAdvice {
             Object actualArg = actualArgs[i];
 
             if (parameter.isAnnotationPresent(Jwt.class)) {
-                Claims claims = (Claims) jwtParser.parse((String) actualArg).getBody();
+                Claims claims;
+
+                try {
+                    claims = (Claims) jwtParser.parse((String) actualArg).getBody();
+                } catch (ExpiredJwtException | MalformedJwtException | SignatureException | IllegalArgumentException e) {
+                    throw new ForbiddenException("Unable to parse JWT", e);
+                }
+
                 for (Object scopeObj : claims.get("scp", List.class)) {
                     if (requiredScopes.contains((String) scopeObj)) {
                         return; // hurray

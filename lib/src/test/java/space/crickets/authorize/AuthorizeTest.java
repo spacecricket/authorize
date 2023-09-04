@@ -3,10 +3,12 @@ package space.crickets.authorize;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.ExpiredJwtException;
 import io.jsonwebtoken.Header;
 import io.jsonwebtoken.JwtParser;
+import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.impl.DefaultClaims;
-import org.junit.Before;
+import io.jsonwebtoken.security.SignatureException;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -34,41 +36,32 @@ public class AuthorizeTest {
     @Configuration
     @Import(HelloController.class)
     public static class TestConfig {
+        /*
+         * An actual JwtParser only works with valid JWTs. It's far too much trouble to create valid JWTs that
+         * have valid signatures and are unexpired.
+         */
         @MockBean
-        public JwtParser jwtParser; // override the actual JwtParser
+        public JwtParser jwtParser;
     }
 
     @Autowired HelloController subject;
     @Autowired JwtParser jwtParser;
 
-    private static final String AUTHORIZATION = "j.w.t";
+    private static final String AUTHORIZATION = "Bearer j.w.t";
     private static final String ROGER = "Roger";
-    private static final String EXPECTED_RESPONSE = "Hello Roger";
+    private static final String HELLO_ROGER = "Hello Roger";
 
-    @Before public void setup() {
-        reset(jwtParser);
-    }
-
-    @Test public void testAuthorizeAnnotation() {
+    @Test public void whenJwtContainsOneOfTheRequiredScopes() {
         // JWT contains one of the required scopes
         when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt("greeting.read"));
 
         assertEquals(
-                EXPECTED_RESPONSE,
+                HELLO_ROGER,
                 subject.getGreetingByName_checkScopes(ROGER, AUTHORIZATION)
         );
+    }
 
-        // JWT contains both of the required scopes
-        reset(jwtParser);
-        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt("greeting.write"));
-
-        assertEquals(
-                EXPECTED_RESPONSE,
-                subject.getGreetingByName_checkScopes(ROGER, AUTHORIZATION)
-        );
-
-        // JWT contains both of the required scopes, AND more
-        reset(jwtParser);
+    @Test public void whenJwtContainsMoreThanOneOfTheRequiredScopes() {
         when(jwtParser.parse(AUTHORIZATION)).thenReturn(
                 jwt(
                         "greeting.read",
@@ -78,16 +71,61 @@ public class AuthorizeTest {
         );
 
         assertEquals(
-                EXPECTED_RESPONSE,
+                HELLO_ROGER,
                 subject.getGreetingByName_checkScopes(ROGER, AUTHORIZATION)
         );
+    }
 
-        // JWT does not contain any of the required scopes
-        reset(jwtParser);
+    @Test public void whenJwtLacksAnyOfTheRequiredScopes() {
         when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt("something-else"));
 
         assertThrows(
                 ForbiddenException.class,
+                () -> subject.getGreetingByName_checkScopes(ROGER, AUTHORIZATION)
+        );
+    }
+
+    @Test public void whenJwtParsingFailsWithExpiredJwtException() {
+        when(jwtParser.parse(AUTHORIZATION)).thenThrow(ExpiredJwtException.class);
+
+        assertThrows(
+                ForbiddenException.class,
+                () -> subject.getGreetingByName_checkScopes(ROGER, AUTHORIZATION)
+        );
+    }
+
+    @Test public void whenJwtParsingFailsWithMalformedJwtException() {
+        when(jwtParser.parse(AUTHORIZATION)).thenThrow(MalformedJwtException.class);
+
+        assertThrows(
+                ForbiddenException.class,
+                () -> subject.getGreetingByName_checkScopes(ROGER, AUTHORIZATION)
+        );
+    }
+
+    @Test public void whenJwtParsingFailsWithSignatureException() {
+        when(jwtParser.parse(AUTHORIZATION)).thenThrow(SignatureException.class);
+
+        assertThrows(
+                ForbiddenException.class,
+                () -> subject.getGreetingByName_checkScopes(ROGER, AUTHORIZATION)
+        );
+    }
+
+    @Test public void whenJwtParsingFailsWithIllegalArgumentException() {
+        when(jwtParser.parse(AUTHORIZATION)).thenThrow(IllegalArgumentException.class);
+
+        assertThrows(
+                ForbiddenException.class,
+                () -> subject.getGreetingByName_checkScopes(ROGER, AUTHORIZATION)
+        );
+    }
+
+    @Test public void whenJwtParsingFailsWithAnUnexpectedException() {
+        when(jwtParser.parse(AUTHORIZATION)).thenThrow(IndexOutOfBoundsException.class);
+
+        assertThrows(
+                IndexOutOfBoundsException.class, // not ForbiddenException
                 () -> subject.getGreetingByName_checkScopes(ROGER, AUTHORIZATION)
         );
     }
@@ -111,6 +149,9 @@ public class AuthorizeTest {
         );
     }
 
+    /**
+     * This class makes it easier to mock jwts.
+     */
     private record Jwt<H extends Header<H>>(Claims claims) implements io.jsonwebtoken.Jwt<H, Claims> {
         @Override
             public H getHeader() {
