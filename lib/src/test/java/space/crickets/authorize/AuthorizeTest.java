@@ -24,7 +24,10 @@ import static org.mockito.Mockito.*;
  * Ensures the various annotations work.
  */
 @RunWith(SpringRunner.class)
-@SpringBootTest(classes = {AuthorizeTest.TestConfig.class})
+@SpringBootTest(classes = {
+        AppConfig.class, // The main configuration
+        AuthorizeTest.TestConfig.class // Test overrides
+})
 public class AuthorizeTest {
 
     @Configuration
