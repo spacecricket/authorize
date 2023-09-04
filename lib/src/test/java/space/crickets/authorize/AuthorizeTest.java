@@ -3,6 +3,8 @@ package space.crickets.authorize;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Lists;
 import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Header;
+import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.impl.DefaultClaims;
 import org.junit.Before;
 import org.junit.Test;
@@ -14,7 +16,6 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Import;
 import org.springframework.test.context.junit4.SpringRunner;
 import space.crickets.authorize.exceptions.ForbiddenException;
-import space.crickets.authorize.internals.ClaimsParser;
 import space.crickets.authorize.testhelpers.HelloController;
 
 import static org.junit.Assert.*;
@@ -34,24 +35,23 @@ public class AuthorizeTest {
     @Import(HelloController.class)
     public static class TestConfig {
         @MockBean
-        public ClaimsParser claimsParser;
+        public JwtParser jwtParser; // override the actual JwtParser
     }
 
     @Autowired HelloController subject;
-    @Autowired ClaimsParser claimsParser;
+    @Autowired JwtParser jwtParser;
 
     private static final String AUTHORIZATION = "j.w.t";
-    private static final Claims DEFAULT_CLAIMS = claims("greeting.read");
     private static final String ROGER = "Roger";
     private static final String EXPECTED_RESPONSE = "Hello Roger";
 
     @Before public void setup() {
-        reset(claimsParser);
+        reset(jwtParser);
     }
 
     @Test public void testAuthorizeAnnotation() {
         // JWT contains one of the required scopes
-        when(claimsParser.parse(AUTHORIZATION)).thenReturn(DEFAULT_CLAIMS);
+        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt("greeting.read"));
 
         assertEquals(
                 EXPECTED_RESPONSE,
@@ -59,8 +59,8 @@ public class AuthorizeTest {
         );
 
         // JWT contains both of the required scopes
-        reset(claimsParser);
-        when(claimsParser.parse(AUTHORIZATION)).thenReturn(claims("greeting.write"));
+        reset(jwtParser);
+        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt("greeting.write"));
 
         assertEquals(
                 EXPECTED_RESPONSE,
@@ -68,9 +68,9 @@ public class AuthorizeTest {
         );
 
         // JWT contains both of the required scopes, AND more
-        reset(claimsParser);
-        when(claimsParser.parse(AUTHORIZATION)).thenReturn(
-                claims(
+        reset(jwtParser);
+        when(jwtParser.parse(AUTHORIZATION)).thenReturn(
+                jwt(
                         "greeting.read",
                         "greeting.write",
                         "something-else"
@@ -83,8 +83,8 @@ public class AuthorizeTest {
         );
 
         // JWT does not contain any of the required scopes
-        reset(claimsParser);
-        when(claimsParser.parse(AUTHORIZATION)).thenReturn(claims("something-else"));
+        reset(jwtParser);
+        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt("something-else"));
 
         assertThrows(
                 ForbiddenException.class,
@@ -105,12 +105,21 @@ public class AuthorizeTest {
     /**
      * Helper that returns a Claims object containing the provided scopes.
      */
-    private static Claims claims(String... scopes) {
-        return new DefaultClaims(
-                ImmutableMap.of(
-                        "scp",
-                        Lists.newArrayList(scopes)
-                )
+    private static <H extends Header<H>> io.jsonwebtoken.Jwt<H, Claims> jwt(String... scopes) {
+        return new Jwt<>(
+                new DefaultClaims(ImmutableMap.of("scp", Lists.newArrayList(scopes)))
         );
     }
+
+    private record Jwt<H extends Header<H>>(Claims claims) implements io.jsonwebtoken.Jwt<H, Claims> {
+        @Override
+            public H getHeader() {
+                return null;
+            }
+
+            @Override
+            public Claims getBody() {
+                return claims;
+            }
+        }
 }
