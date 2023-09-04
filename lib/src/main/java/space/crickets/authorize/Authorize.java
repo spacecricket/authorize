@@ -22,5 +22,5 @@ public @interface Authorize {
      * This has been named scopes instead of value() to make it explicit that the
      * validation happens on scopes, not other non-scope claims.
      */
-    String[] scopes();
+    String[] scopes() default {};
 }

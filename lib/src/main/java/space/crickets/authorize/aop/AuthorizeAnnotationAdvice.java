@@ -37,8 +37,6 @@ public class AuthorizeAnnotationAdvice {
         Parameter[] parameters = methodSignature.getMethod().getParameters();
         Object[] actualArgs = joinPoint.getArgs();
 
-        // TODO verify authenticity of JWT
-
         for (int i = 0; i < parameters.length; i++) {
             Parameter parameter = parameters[i];
             Object actualArg = actualArgs[i];
@@ -52,9 +50,13 @@ public class AuthorizeAnnotationAdvice {
                     throw new ForbiddenException("Unable to parse JWT", e);
                 }
 
+                if (requiredScopes.isEmpty()) {
+                    return; // no scope is required to be in the JWT
+                }
+
                 for (Object scopeObj : claims.get("scp", List.class)) {
                     if (requiredScopes.contains((String) scopeObj)) {
-                        return; // hurray
+                        return; // one of the required scopes was found in the JWT
                     }
                 }
             }

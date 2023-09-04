@@ -51,6 +51,16 @@ public class AuthorizeTest {
     private static final String ROGER = "Roger";
     private static final String HELLO_ROGER = "Hello Roger";
 
+    @Test public void whenNoScopeIsRequired() {
+        // JWT contains some scope
+        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt("greeting.read"));
+
+        assertEquals(
+                HELLO_ROGER,
+                subject.getGreetingByName_checkNoScope(ROGER, AUTHORIZATION)
+        );
+    }
+
     @Test public void whenJwtContainsOneOfTheRequiredScopes() {
         // JWT contains one of the required scopes
         when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt("greeting.read"));

@@ -14,6 +14,16 @@ import space.crickets.authorize.testhelpers.fakeannotations.RestController;
 @RestController
 @RequestMapping("/api/hello")
 public class HelloController {
+    @Authorize
+    @GetMapping("/one/{name}")
+    public String getGreetingByName_checkNoScope(
+            @PathVariable String name,
+            @RequestHeader @Jwt String authorization
+    ) {
+        // do something
+        return "Hello " + name;
+    }
+
     @Authorize(scopes = {"greeting.read", "greeting.write"})
     @GetMapping("/one/{name}")
     public String getGreetingByName_checkScopes(
