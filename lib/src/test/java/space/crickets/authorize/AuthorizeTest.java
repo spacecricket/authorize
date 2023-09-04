@@ -42,6 +42,8 @@ public class AuthorizeTest {
 
     private static final String AUTHORIZATION = "j.w.t";
     private static final Claims DEFAULT_CLAIMS = claims("greeting.read");
+    private static final String ROGER = "Roger";
+    private static final String EXPECTED_RESPONSE = "Hello Roger";
 
     @Before public void setup() {
         reset(claimsParser);
@@ -51,17 +53,19 @@ public class AuthorizeTest {
         // JWT contains one of the required scopes
         when(claimsParser.parse(AUTHORIZATION)).thenReturn(DEFAULT_CLAIMS);
 
-        String response = subject.getGreetingByName_checkScopes("Roger", AUTHORIZATION);
-
-        assertEquals("Hello Roger", response);
+        assertEquals(
+                EXPECTED_RESPONSE,
+                subject.getGreetingByName_checkScopes(ROGER, AUTHORIZATION)
+        );
 
         // JWT contains both of the required scopes
         reset(claimsParser);
         when(claimsParser.parse(AUTHORIZATION)).thenReturn(claims("greeting.write"));
 
-        response = subject.getGreetingByName_checkScopes("Roger", AUTHORIZATION);
-
-        assertEquals("Hello Roger", response);
+        assertEquals(
+                EXPECTED_RESPONSE,
+                subject.getGreetingByName_checkScopes(ROGER, AUTHORIZATION)
+        );
 
         // JWT contains both of the required scopes, AND more
         reset(claimsParser);
@@ -73,9 +77,10 @@ public class AuthorizeTest {
                 )
         );
 
-        response = subject.getGreetingByName_checkScopes("Roger", AUTHORIZATION);
-
-        assertEquals("Hello Roger", response);
+        assertEquals(
+                EXPECTED_RESPONSE,
+                subject.getGreetingByName_checkScopes(ROGER, AUTHORIZATION)
+        );
 
         // JWT does not contain any of the required scopes
         reset(claimsParser);
@@ -83,7 +88,7 @@ public class AuthorizeTest {
 
         assertThrows(
                 ForbiddenException.class,
-                () -> subject.getGreetingByName_checkScopes("Roger", AUTHORIZATION)
+                () -> subject.getGreetingByName_checkScopes(ROGER, AUTHORIZATION)
         );
     }
 
