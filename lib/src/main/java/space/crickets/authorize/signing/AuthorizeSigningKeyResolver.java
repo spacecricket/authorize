@@ -7,6 +7,10 @@ import io.jsonwebtoken.SigningKeyResolverAdapter;
 import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.Response;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Profile;
+import org.springframework.stereotype.Component;
 import space.crickets.authorize.exceptions.ForbiddenException;
 
 import javax.annotation.PostConstruct;
@@ -19,6 +23,8 @@ import java.util.Map;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+@Component
+@Profile("!test")
 public class AuthorizeSigningKeyResolver extends SigningKeyResolverAdapter {
     private final Request publicKeysRequest;
     private final OkHttpClient okHttpClient = new OkHttpClient();
@@ -31,7 +37,7 @@ public class AuthorizeSigningKeyResolver extends SigningKeyResolverAdapter {
     // This is volatile so that its contents become visible to all other threads after a write operation immediately.
     private volatile Map<String, PublicKey> publicKeys = new HashMap<>();
 
-    public AuthorizeSigningKeyResolver(String jwksUrl) {
+    public AuthorizeSigningKeyResolver(@Qualifier("jwksUrl") String jwksUrl) {
         this.publicKeysRequest = new Request.Builder()
                 .url(jwksUrl)
                 .addHeader("Accept", "application/json")
