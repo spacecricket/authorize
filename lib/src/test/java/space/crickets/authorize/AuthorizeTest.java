@@ -173,10 +173,25 @@ public class AuthorizeTest {
         );
     }
 
-//    @Test public void testBindClaim() {
-//        String response = subject.getGreetingByName_checkScopesAndMatchNameAndCheckAge("Roger", null,"");
-//        assertEquals("Hello Roger", response);
-//    }
+    @Test public void whenJwtClaimOverwritesMethodArgWithAge12() {
+        // JWT contains one of the required scopes
+        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt(ROGER, 12, "greeting.read"));
+
+        assertThrows(
+                ForbiddenException.class,
+                () -> subject.getGreetingByName_bindAndCheckAge(ROGER, null, AUTHORIZATION)
+        );
+    }
+
+    @Test public void whenJwtClaimOverwritesMethodArgWithAge28() {
+        // JWT contains one of the required scopes
+        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt(ROGER, 28, "greeting.read"));
+
+        assertEquals(
+                HELLO_ROGER,
+                subject.getGreetingByName_bindAndCheckAge(ROGER, null, AUTHORIZATION)
+        );
+    }
 
     /**
      * Helper that returns a Claims object containing the provided scopes, full name and age claims.

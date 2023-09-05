@@ -6,11 +6,13 @@ import io.jsonwebtoken.JwtParser;
 import io.jsonwebtoken.MalformedJwtException;
 import io.jsonwebtoken.security.SignatureException;
 import org.aspectj.lang.JoinPoint;
+import org.aspectj.lang.ProceedingJoinPoint;
+import org.aspectj.lang.annotation.Around;
 import org.aspectj.lang.annotation.Aspect;
-import org.aspectj.lang.annotation.Before;
 import org.aspectj.lang.reflect.MethodSignature;
 import org.springframework.stereotype.Component;
 import space.crickets.authorize.Authorize;
+import space.crickets.authorize.BindClaim;
 import space.crickets.authorize.Jwt;
 import space.crickets.authorize.MatchClaim;
 import space.crickets.authorize.exceptions.ForbiddenException;
@@ -33,8 +35,8 @@ public class AuthorizeAdvice {
         this.jwtParser = jwtParser;
     }
 
-    @Before("@annotation(authorize)")
-    public void performAuthorizationChecks(JoinPoint joinPoint, Authorize authorize) {
+    @Around("@annotation(authorize)")
+    public Object performAuthorizationChecks(ProceedingJoinPoint joinPoint, Authorize authorize) throws Throwable {
         io.jsonwebtoken.Jwt<?, Claims> jwt = verifyJwt(joinPoint);
 
         Claims claims = jwt.getBody();
@@ -42,9 +44,13 @@ public class AuthorizeAdvice {
         verifyScopes(authorize, claims);
 
         verifyClaims(joinPoint, claims);
+
+        Object[] updatedArgs = bindClaims(joinPoint, claims);
+
+        return joinPoint.proceed(updatedArgs);
     }
 
-    private io.jsonwebtoken.Jwt verifyJwt(JoinPoint joinPoint) {
+    private io.jsonwebtoken.Jwt<?, Claims> verifyJwt(JoinPoint joinPoint) {
         // Grab the JWT
         MethodSignature methodSignature = (MethodSignature) joinPoint.getSignature();
         Parameter[] parameters = methodSignature.getMethod().getParameters();
@@ -106,5 +112,26 @@ public class AuthorizeAdvice {
                 }
             }
         }
+    }
+
+    private Object[] bindClaims(ProceedingJoinPoint joinPoint, Claims claims) {
+        MethodSignature methodSignature = (MethodSignature) joinPoint.getSignature();
+        Parameter[] parameters = methodSignature.getMethod().getParameters();
+        Object[] updatedArgs = joinPoint.getArgs();
+
+        for (int i = 0; i < parameters.length; i++) {
+            Parameter parameter = parameters[i];
+
+            if (parameter.isAnnotationPresent(BindClaim.class)) {
+                BindClaim bindClaim = parameter.getAnnotation(BindClaim.class);
+                String claimName = bindClaim.value();
+
+                if (claims.containsKey(claimName)) {
+                    updatedArgs[i] = claims.get(claimName);
+                }
+            }
+        }
+
+        return updatedArgs;
     }
 }

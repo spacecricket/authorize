@@ -1,10 +1,10 @@
 package space.crickets.authorize.testhelpers;
 
 import space.crickets.authorize.Authorize;
-//import space.crickets.authorize.BindClaim;
+import space.crickets.authorize.BindClaim;
 import space.crickets.authorize.Jwt;
 import space.crickets.authorize.MatchClaim;
-//import space.crickets.authorize.exceptions.ForbiddenException;
+import space.crickets.authorize.exceptions.ForbiddenException;
 import space.crickets.authorize.testhelpers.fakeannotations.GetMapping;
 import space.crickets.authorize.testhelpers.fakeannotations.PathVariable;
 import space.crickets.authorize.testhelpers.fakeannotations.RequestHeader;
@@ -45,18 +45,20 @@ public class HelloController {
         return "Hello " + name;
     }
 
-//    @Authorize(scopes = {"greeting.read", "greeting.write"})
-//    @GetMapping("/{name}")
-//    public String getGreetingByName_bindAndCheckAge(
-//            @PathVariable @MatchClaim("full-name") String name,
-//            @BindClaim("age") Integer age,
-//            @RequestHeader @Jwt String ignoredAuthorization
-//    ) {
-//        if (age < 13) {
-//            throw new ForbiddenException("User is only " + age + "!");
-//        }
-//
-//        // do something
-//        return "Hello " + name;
-//    }
+    @Authorize(scopes = {"greeting.read", "greeting.write"})
+    @GetMapping("/{name}")
+    public String getGreetingByName_bindAndCheckAge(
+            @PathVariable @MatchClaim("full-name") String name,
+            @BindClaim("age") Integer age,
+            @RequestHeader @Jwt String ignoredAuthorization
+    ) {
+        assert age != null; // The @BindClaim should overwrite whatever is passed in.
+
+        if (age < 13) {
+            throw new ForbiddenException("User is only " + age + "!");
+        }
+
+        // do something
+        return "Hello " + name;
+    }
 }
