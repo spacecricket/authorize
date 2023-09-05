@@ -8,9 +8,6 @@ import space.crickets.authorize.aop.AuthorizeAdvice;
 
 @Configuration
 @EnableAspectJAutoProxy // Needed to get @Authorize and our other annotations to work
-@Import({
-        AuthorizeAdvice.class,
-        JwtParser.class
-})
+@Import(AuthorizeAdvice.class)
 public class AppConfig {
 }
