@@ -13,6 +13,7 @@ import javax.annotation.PostConstruct;
 import java.io.IOException;
 import java.security.Key;
 import java.security.PublicKey;
+import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.locks.Lock;
@@ -24,7 +25,7 @@ public class AuthorizeSigningKeyResolver extends SigningKeyResolverAdapter {
     private final PublicKeyBuilder publicKeyBuilder = new PublicKeyBuilder();
     private static final Gson gson = new Gson();
     private final Lock lock = new ReentrantLock();
-
+    private Instant rotatedAt = Instant.EPOCH; // i.e. not yet
 
     // Stores/caches public keys.
     // This is volatile so that its contents become visible to all other threads after a write operation immediately.
@@ -42,7 +43,7 @@ public class AuthorizeSigningKeyResolver extends SigningKeyResolverAdapter {
      * Done once at startup, then later as needed.
      */
     @PostConstruct
-    public void fetchKeys() {
+    public synchronized void fetchKeys() {
         try (Response response = okHttpClient.newCall(publicKeysRequest).execute()) {
             if (!response.isSuccessful()) {
                 throw new RuntimeException("Call to " + publicKeysRequest.url() + " failed");
@@ -59,6 +60,9 @@ public class AuthorizeSigningKeyResolver extends SigningKeyResolverAdapter {
                 PublicKey publicKey = publicKeyBuilder.buildPublicKey(jsonWebKey);
                 publicKeys.put(jsonWebKey.kid(), publicKey); // should I clear out old keys?
             });
+
+            rotatedAt = Instant.now();
+
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
@@ -76,7 +80,7 @@ public class AuthorizeSigningKeyResolver extends SigningKeyResolverAdapter {
             return publicKey;
         }
 
-        // If it's null, the caller probably used a newly rotated-in key. Or it's a fake key id. DDOS?
+        // If it's null, the caller probably used a newly rotated-in key. Or it's a fake key id. DOS?
 
         lock.lock(); // First thread to reach this line goes in, the rest wait here.
 
@@ -90,7 +94,12 @@ public class AuthorizeSigningKeyResolver extends SigningKeyResolverAdapter {
             }
 
             // Assuming keys got rotated. Let's get the new ones. Only that first thread should hit this.
-            fetchKeys();
+            Instant now = Instant.now();
+
+            // Guard against some kind of Denial Of Service attack.
+            if (RotationClock.hasBeenLongEnoughSinceLastRotation(rotatedAt)) {
+                fetchKeys();
+            }
         } finally {
             lock.unlock();
         }

@@ -9,13 +9,18 @@ import okhttp3.mockwebserver.MockWebServer;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.mockito.MockedStatic;
+import org.mockito.Mockito;
+import space.crickets.authorize.exceptions.ForbiddenException;
 
 import java.io.IOException;
 import java.security.Key;
+import java.time.Instant;
 import java.util.Map;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 
 /**
  * JwtParser comes from io.jsonwebtoken:jjwt-api. We don't want to test external code.
@@ -33,6 +38,9 @@ public class AuthorizeSigningKeyResolverTest {
 
     private static final Claims CLAIMS = new DefaultClaims(); // We're not testing claims
     private static final Gson gson = new Gson();
+
+    private static final Instant now = Instant.now();
+    private static final Instant tenMinutesLater = now.plusSeconds(10 * 60);
 
     @Before
     public void setup() throws IOException {
@@ -84,17 +92,32 @@ public class AuthorizeSigningKeyResolverTest {
      * First, public-keys endpoint returns key 1 (covered by setup() above).
      * Then, a caller asks for key 2, assuming key 1 has been rotated out.
      * Validate that subject goes to the public-keys endpoint to get key 2.
+     * <p>
+     * Lastly, someone keeps quickly sending in key 1 (denial of service?). Let's be resilient to it.
      */
     @Test
     public void whenKey2IsRequested() {
         oauth2Server.enqueue(keysResponse(jsonWebKey2)); // i.e. no longer key1
 
-        subject.resolveSigningKey(jwsHeader(jsonWebKey2), CLAIMS);
-        assertEquals(2, oauth2Server.getRequestCount());
+        // 10 minutes later...
+        try (MockedStatic<RotationClock> rotationClockMock = Mockito.mockStatic(RotationClock.class)) {
+            rotationClockMock.when(() -> RotationClock.hasBeenLongEnoughSinceLastRotation(Mockito.any(Instant.class))).thenReturn(true);
 
-        // This time no outbound http call
-        subject.resolveSigningKey(jwsHeader(jsonWebKey2), CLAIMS);
-        assertEquals(2, oauth2Server.getRequestCount());
+            subject.resolveSigningKey(jwsHeader(jsonWebKey2), CLAIMS);
+            assertEquals(2, oauth2Server.getRequestCount());
+
+            // This time no outbound http call because the cache has key 2
+            subject.resolveSigningKey(jwsHeader(jsonWebKey2), CLAIMS);
+            assertEquals(2, oauth2Server.getRequestCount());
+
+            // Ask for key 1 again. This is too soon since last re-fetch. 403?
+            rotationClockMock.when(() -> RotationClock.hasBeenLongEnoughSinceLastRotation(Mockito.any(Instant.class))).thenReturn(false);
+            assertThrows(
+                    ForbiddenException.class,
+                     () -> subject.resolveSigningKey(jwsHeader(jsonWebKey1), CLAIMS)
+            );
+            assertEquals(2, oauth2Server.getRequestCount()); // still 2
+        }
     }
 
     /**
