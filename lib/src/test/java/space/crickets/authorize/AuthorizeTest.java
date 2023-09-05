@@ -50,10 +50,11 @@ public class AuthorizeTest {
     private static final String AUTHORIZATION = "Bearer j.w.t";
     private static final String ROGER = "Roger";
     private static final String HELLO_ROGER = "Hello Roger";
+    private static final int AGE = 14;
 
     @Test public void whenNoScopeIsRequired() {
         // JWT contains some scope
-        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt("greeting.read"));
+        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt(ROGER, AGE, "greeting.read"));
 
         assertEquals(
                 HELLO_ROGER,
@@ -63,7 +64,7 @@ public class AuthorizeTest {
 
     @Test public void whenJwtContainsOneOfTheRequiredScopes() {
         // JWT contains one of the required scopes
-        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt("greeting.read"));
+        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt(ROGER, AGE, "greeting.read"));
 
         assertEquals(
                 HELLO_ROGER,
@@ -74,6 +75,8 @@ public class AuthorizeTest {
     @Test public void whenJwtContainsMoreThanOneOfTheRequiredScopes() {
         when(jwtParser.parse(AUTHORIZATION)).thenReturn(
                 jwt(
+                        ROGER,
+                        AGE,
                         "greeting.read",
                         "greeting.write",
                         "something-else"
@@ -87,7 +90,7 @@ public class AuthorizeTest {
     }
 
     @Test public void whenJwtLacksAnyOfTheRequiredScopes() {
-        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt("something-else"));
+        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt(ROGER, AGE, "something-else"));
 
         assertThrows(
                 ForbiddenException.class,
@@ -140,22 +143,53 @@ public class AuthorizeTest {
         );
     }
 
-//    @Test public void testMatchClaim() {
-//        String response = subject.getGreetingByName_checkScopesAndMatchName("Roger", "");
-//        assertEquals("Hello Roger", response);
-//    }
-//
+    @Test public void whenNameAndAgeMatchClaims() {
+        // JWT contains one of the required scopes
+        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt(ROGER, AGE, "greeting.read"));
+
+        assertEquals(
+                HELLO_ROGER,
+                subject.getGreetingByName_matchNameAndAge(ROGER, AGE, AUTHORIZATION)
+        );
+    }
+
+    @Test public void whenNameDoesNotMatchClaim() {
+        // JWT contains one of the required scopes
+        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt("Rafael", AGE, "greeting.read"));
+
+        assertThrows(
+                ForbiddenException.class,
+                () -> subject.getGreetingByName_matchNameAndAge(ROGER, AGE, AUTHORIZATION)
+        );
+    }
+
+    @Test public void whenAgeDoesNotMatchClaim() {
+        // JWT contains one of the required scopes
+        when(jwtParser.parse(AUTHORIZATION)).thenReturn(jwt(ROGER, 17, "greeting.read"));
+
+        assertThrows(
+                ForbiddenException.class,
+                () -> subject.getGreetingByName_matchNameAndAge(ROGER, AGE, AUTHORIZATION)
+        );
+    }
+
 //    @Test public void testBindClaim() {
 //        String response = subject.getGreetingByName_checkScopesAndMatchNameAndCheckAge("Roger", null,"");
 //        assertEquals("Hello Roger", response);
 //    }
 
     /**
-     * Helper that returns a Claims object containing the provided scopes.
+     * Helper that returns a Claims object containing the provided scopes, full name and age claims.
      */
-    private static <H extends Header<H>> io.jsonwebtoken.Jwt<H, Claims> jwt(String... scopes) {
+    private static <H extends Header<H>> io.jsonwebtoken.Jwt<H, Claims> jwt(String fullName, int age, String... scopes) {
         return new Jwt<>(
-                new DefaultClaims(ImmutableMap.of("scp", Lists.newArrayList(scopes)))
+                new DefaultClaims(
+                        ImmutableMap.of(
+                                "scp", Lists.newArrayList(scopes),
+                                "full-name", fullName,
+                                "age", age
+                        )
+                )
         );
     }
 
