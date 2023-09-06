@@ -11,6 +11,10 @@ import space.crickets.authorize.testhelpers.fakeannotations.RequestHeader;
 import space.crickets.authorize.testhelpers.fakeannotations.RequestMapping;
 import space.crickets.authorize.testhelpers.fakeannotations.RestController;
 
+/**
+ * This looks like a real @RestController, but the annotations used here are fake.
+ * The point of this class is to make the tests in `AuthorizeTest.java` more readable.
+ */
 @RestController
 @RequestMapping("/api/hello")
 public class HelloController {

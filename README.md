@@ -115,9 +115,30 @@ public class HelloController {
 ```
 
 # Callouts
+
+* Requires Java 17 and above.
 * This library needs to make outbound HTTP calls to the oauth provider to get updated public keys. There are concurrency concerns here.
+* Don't use this along with another library that does Oauth security.
 * Spring AOP is used to get these new annotations to work.
 * Probably the most important one - this is a hobby project!
 
 # Setup
-... TODO
+
+Make sure you import the following in your service's Spring Boot configuration: 
+```java
+@Configuration
+// ...
+@Import({
+        // ...
+        space.crickets.authorize.AppConfig.class
+})
+public class YourConfiguration {
+    // ...
+}
+```
+and your `application.properties` (or yaml etc) needs:
+```properties
+jwks-url = https://your-oauth-service.com/blah/v1/keys
+```
+
+Enjoy!
