@@ -124,6 +124,8 @@ public class HelloController {
 
 # Setup
 
+TODO: Publish to maven central and update dependency instruction.
+
 Make sure you import the following in your service's Spring Boot configuration: 
 ```java
 @Configuration
